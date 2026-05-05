@@ -525,35 +525,45 @@ const drawPlayer = (ctx: CanvasRenderingContext2D, state: GameState) => {
   const airborne = !player.onGround;
 
   if (player.character === "legend24" && legend24HeroSprite.complete) {
-    const bobY = running ? Math.sin(state.time * 11) * 1.8 : 0;
+    const idleFloat = !running && !airborne ? Math.sin(state.time * 2.8) * 1.2 : 0;
+    const bobY = running ? Math.sin(state.time * 11) * 1.8 : idleFloat;
     const attackProgress =
       player.attackTimer > 0
         ? 1 - player.attackTimer / 0.22
         : 0;
-    const attackLean = player.attackTimer > 0 ? 0.22 - attackProgress * 0.12 : 0;
-    const runLean = running ? Math.sin(state.time * 11) * 0.05 : 0;
-    const jumpLean = airborne ? player.vy * 0.00055 : 0;
-    const scaleY = airborne ? 1.03 : 1;
-    const scaleX = airborne ? 0.97 : 1;
-    const attackShiftX = player.attackTimer > 0 ? 4 + attackProgress * 4 : 0;
-    const attackShiftY = player.attackTimer > 0 ? -2 + attackProgress * 3 : 0;
+    const runCycle = Math.sin(state.time * 11);
+    const attackLean = player.attackTimer > 0 ? 0.28 - attackProgress * 0.16 : 0;
+    const runLean = running ? runCycle * 0.08 : 0;
+    const jumpLean = airborne ? player.vy * 0.00075 : 0;
+    const attackShiftX = player.attackTimer > 0 ? 5 + attackProgress * 7 : 0;
+    const attackShiftY = player.attackTimer > 0 ? -4 + attackProgress * 5 : 0;
+    const drawWidth = player.attackTimer > 0 ? 56 : airborne ? 50 : running ? 51 : 50;
+    const drawHeight = player.attackTimer > 0 ? 80 : airborne ? 74 : running ? 74 : 72;
+    const drawX = -drawWidth / 2 + attackShiftX;
+    const drawY = -drawHeight / 2 - 1 + bobY + attackShiftY;
+    const scaleY = airborne ? 1.05 : running ? 0.98 + Math.abs(runCycle) * 0.03 : 1.01;
+    const scaleX = airborne ? 0.95 : running ? 1.01 + Math.abs(runCycle) * 0.02 : 0.99;
     ctx.save();
     if (flash) ctx.globalAlpha = 0.74;
     ctx.translate(x + player.width / 2, y + player.height / 2);
     if (player.facing < 0) ctx.scale(-1, 1);
     ctx.rotate((player.facing > 0 ? 1 : -1) * (attackLean + runLean + jumpLean));
     ctx.scale(scaleX, scaleY);
-    ctx.drawImage(
-      legend24HeroSprite,
-      -26 + attackShiftX,
-      -38 + bobY + attackShiftY,
-      52,
-      76,
-    );
+    if (running) {
+      ctx.globalAlpha = 0.16;
+      ctx.drawImage(legend24HeroSprite, drawX - 4, drawY + 1, drawWidth, drawHeight);
+      ctx.globalAlpha = flash ? 0.74 : 1;
+    }
+    if (player.attackTimer > 0) {
+      ctx.globalAlpha = 0.2;
+      ctx.drawImage(legend24HeroSprite, drawX - 6, drawY + 3, drawWidth, drawHeight);
+      ctx.globalAlpha = flash ? 0.74 : 1;
+    }
+    ctx.drawImage(legend24HeroSprite, drawX, drawY, drawWidth, drawHeight);
     if (player.attackTimer > 0) {
       const dir = player.facing > 0 ? 1 : -1;
-      const arcX = dir > 0 ? 12 : -24;
-      const arcY = -14 + attackProgress * 10;
+      const arcX = dir > 0 ? 14 : -30;
+      const arcY = -18 + attackProgress * 14;
       ctx.globalAlpha = 0.88;
       ctx.shadowBlur = 18;
       ctx.shadowColor = "#ff9a2f";
@@ -564,6 +574,11 @@ const drawPlayer = (ctx: CanvasRenderingContext2D, state: GameState) => {
       px(ctx, arcX - dir * 8, arcY - 2, 10, 10, "#ff9e34");
       px(ctx, arcX - dir * 14, arcY - 6, 8, 8, "#ffbf61");
       ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+    } else if (airborne) {
+      ctx.globalAlpha = 0.22;
+      px(ctx, -10, 18, 20, 3, "#5ec8ff");
+      px(ctx, -6, 22, 12, 2, "#d7f4ff");
       ctx.globalAlpha = 1;
     }
     ctx.restore();
