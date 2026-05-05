@@ -526,24 +526,45 @@ const drawPlayer = (ctx: CanvasRenderingContext2D, state: GameState) => {
 
   if (player.character === "legend24" && legend24HeroSprite.complete) {
     const bobY = running ? Math.sin(state.time * 11) * 1.8 : 0;
-    const attackLean = player.attackTimer > 0 ? 0.12 : 0;
+    const attackProgress =
+      player.attackTimer > 0
+        ? 1 - player.attackTimer / 0.22
+        : 0;
+    const attackLean = player.attackTimer > 0 ? 0.22 - attackProgress * 0.12 : 0;
     const runLean = running ? Math.sin(state.time * 11) * 0.05 : 0;
     const jumpLean = airborne ? player.vy * 0.00055 : 0;
     const scaleY = airborne ? 1.03 : 1;
     const scaleX = airborne ? 0.97 : 1;
+    const attackShiftX = player.attackTimer > 0 ? 4 + attackProgress * 4 : 0;
+    const attackShiftY = player.attackTimer > 0 ? -2 + attackProgress * 3 : 0;
     ctx.save();
     if (flash) ctx.globalAlpha = 0.74;
     ctx.translate(x + player.width / 2, y + player.height / 2);
     if (player.facing < 0) ctx.scale(-1, 1);
     ctx.rotate((player.facing > 0 ? 1 : -1) * (attackLean + runLean + jumpLean));
     ctx.scale(scaleX, scaleY);
-    ctx.drawImage(legend24HeroSprite, -26, -38 + bobY, 52, 76);
+    ctx.drawImage(
+      legend24HeroSprite,
+      -26 + attackShiftX,
+      -38 + bobY + attackShiftY,
+      52,
+      76,
+    );
     if (player.attackTimer > 0) {
-      ctx.shadowBlur = 14;
+      const dir = player.facing > 0 ? 1 : -1;
+      const arcX = dir > 0 ? 12 : -24;
+      const arcY = -14 + attackProgress * 10;
+      ctx.globalAlpha = 0.88;
+      ctx.shadowBlur = 18;
       ctx.shadowColor = "#ff9a2f";
-      px(ctx, player.facing > 0 ? 10 : -18, -10, 12, 12, "#ff8a1c", "#ffd27d");
-      px(ctx, player.facing > 0 ? 13 : -15, -7, 6, 6, "#ffb445");
+      px(ctx, arcX, arcY, 14, 14, "#ff8a1c", "#ffd27d");
+      px(ctx, arcX + dir * 8, arcY + 4, 12, 12, "#ffb445", "#ffe5a8");
+      px(ctx, arcX + dir * 16, arcY + 8, 10, 10, "#ff6d1f", "#ffd27d");
+      ctx.globalAlpha = 0.45;
+      px(ctx, arcX - dir * 8, arcY - 2, 10, 10, "#ff9e34");
+      px(ctx, arcX - dir * 14, arcY - 6, 8, 8, "#ffbf61");
       ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
     }
     ctx.restore();
     return;

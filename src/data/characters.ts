@@ -20,9 +20,9 @@ export const CHARACTER_OPTIONS: CharacterOption[] = [
   },
   {
     id: "legend24",
-    name: "传奇 24",
+    name: "man",
     title: "持球战魂",
-    description: "金紫战袍与灵火篮球一体成势，像素传奇感更强，适合做展示版主角。",
+    description: "金紫战袍与灵火篮球一体成势，出手时会带出更明显的正面砸击动作。",
     styleNote: "原创传奇球手 · 手持篮球",
     preview: assetUrl("assets/generated/characters/legend24-hero.png"),
   },
