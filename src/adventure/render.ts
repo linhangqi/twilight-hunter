@@ -13,6 +13,7 @@ const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
 
 const heroSheet  = loadImage(assetUrl("assets/processed/hero-sheet.png"));
+const legend24HeroSprite = loadImage(assetUrl("assets/generated/characters/legend24-hero.png"));
 const enemySheet = loadImage(assetUrl("assets/processed/enemy-sheet.png"));
 const envSheet   = loadImage(assetUrl("assets/processed/environment-sheet.png"));
 const princessSprite = loadImage(assetUrl("assets/generated/story/princess.png"));
@@ -520,6 +521,26 @@ const drawPlayer = (ctx: CanvasRenderingContext2D, state: GameState) => {
   const x = player.x - cameraX;
   const y = player.y;
   const flash = player.hurtTimer > 0 && Math.floor(player.hurtTimer * 12) % 2 === 0;
+
+  if (player.character === "legend24" && legend24HeroSprite.complete) {
+    const bobY = Math.abs(player.vx) > 20 && player.onGround ? Math.sin(state.time * 10) * 2.5 : 0;
+    const attackLean = player.attackTimer > 0 ? 0.1 : 0;
+    ctx.save();
+    if (flash) ctx.globalAlpha = 0.74;
+    ctx.translate(x + player.width / 2, y + player.height / 2);
+    if (player.facing < 0) ctx.scale(-1, 1);
+    ctx.rotate(player.facing > 0 ? attackLean : -attackLean);
+    ctx.drawImage(legend24HeroSprite, -42, -50 + bobY, 84, 116);
+    if (player.attackTimer > 0) {
+      ctx.shadowBlur = 14;
+      ctx.shadowColor = "#ff9a2f";
+      px(ctx, player.facing > 0 ? 18 : -30, -12, 18, 18, "#ff8a1c", "#ffd27d");
+      px(ctx, player.facing > 0 ? 22 : -26, -8, 10, 10, "#ffb445");
+      ctx.shadowBlur = 0;
+    }
+    ctx.restore();
+    return;
+  }
 
   if (heroSheet.complete) {
     let frame: (typeof HERO_FRAMES)[number] = HERO_FRAMES[0];

@@ -1,5 +1,6 @@
 import { STAGES, TILE_SIZE, VIEW_WIDTH } from "./stages";
 import {
+  CharacterId,
   EnemyKind,
   EnemyState,
   GameState,
@@ -49,7 +50,8 @@ const enemyStats = (kind: EnemyKind) => {
 
 // ─── Factories ────────────────────────────────────────────────────────────────
 
-const createPlayer = (): PlayerState => ({
+const createPlayer = (character: CharacterId): PlayerState => ({
+  character,
   x: 84, y: 220,
   vx: 0, vy: 0,
   width: 26, height: 38,
@@ -91,11 +93,11 @@ const createEnemy = (
   };
 };
 
-export const createInitialState = (stageId: number): GameState => {
+export const createInitialState = (stageId: number, character: CharacterId = "hunter"): GameState => {
   const stage = STAGES.find((s) => s.id === stageId) ?? STAGES[0];
   return {
     stageId: stage.id,
-    player: createPlayer(),
+    player: createPlayer(character),
     enemies: stage.enemySpawns.map((spawn, i) => createEnemy(stage, spawn, i)),
     particles: [],
     pickups: [],

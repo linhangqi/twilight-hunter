@@ -7,7 +7,7 @@ import { StageSelect } from "./components/StageSelect";
 import { ensureAudioReady, setMusicEnabled, startBackgroundMusic, stopBackgroundMusic } from "./adventure/audio";
 import { createInitialState } from "./adventure/engine";
 import { getStageById, STAGES } from "./adventure/stages";
-import { Screen, GameState, ProgressState } from "./adventure/types";
+import { CharacterId, Screen, GameState, ProgressState } from "./adventure/types";
 import { useLocalStorage } from "./hooks/useLocalStorage";
 import { assetUrl } from "./utils/assets";
 
@@ -17,8 +17,9 @@ export default function App() {
   const [screen, setScreen]               = useState<Screen>("menu");
   const [progress, setProgress]           = useLocalStorage<ProgressState>("twilight-hunter-progress", INITIAL_PROGRESS);
   const [musicEnabled, setMusicEnabledState] = useLocalStorage<boolean>("twilight-hunter-music-enabled", true);
+  const [selectedCharacter, setSelectedCharacter] = useLocalStorage<CharacterId>("twilight-hunter-character", "hunter");
   const [currentStageId, setCurrentStageId] = useState(1);
-  const [gameState, setGameState]         = useState<GameState>(() => createInitialState(1));
+  const [gameState, setGameState]         = useState<GameState>(() => createInitialState(1, selectedCharacter));
   const [showHint, setShowHint]           = useState(true);
   const [tutorialStep, setTutorialStep]   = useState(1);
   const [pauseMenuOpen, setPauseMenuOpen] = useState(false);
@@ -30,11 +31,11 @@ export default function App() {
   );
 
   useEffect(() => {
-    setGameState(createInitialState(currentStageId));
+    setGameState(createInitialState(currentStageId, selectedCharacter));
     setShowHint(true);
     setTutorialStep(1);
     setPauseMenuOpen(false);
-  }, [currentStageId]);
+  }, [currentStageId, selectedCharacter]);
 
   useEffect(() => {
     const normalizedCompleted = progress.completed
@@ -76,7 +77,7 @@ export default function App() {
 
   const openStage = (stageId: number) => {
     setCurrentStageId(stageId);
-    setGameState(createInitialState(stageId));
+    setGameState(createInitialState(stageId, selectedCharacter));
     setShowHint(true);
     setTutorialStep(1);
     setPauseMenuOpen(false);
@@ -118,6 +119,7 @@ export default function App() {
           completedCount={progress.completed.length}
           totalStages={STAGES.length}
           musicEnabled={musicEnabled}
+          selectedCharacter={selectedCharacter}
           onStart={() => {
             ensureAudioReady();
             void startBackgroundMusic("game");
@@ -129,6 +131,7 @@ export default function App() {
             setScreen("stages");
           }}
           onToggleMusic={() => setMusicEnabledState((value) => !value)}
+          onSelectCharacter={setSelectedCharacter}
         />
       )}
 
@@ -223,7 +226,7 @@ export default function App() {
                   <button
                     className="menu-stone-button medium secondary"
                     onClick={() => {
-                      setGameState(createInitialState(currentStageId));
+                      setGameState(createInitialState(currentStageId, selectedCharacter));
                       setShowHint(true);
                       setTutorialStep(1);
                       setPauseMenuOpen(false);
@@ -307,7 +310,7 @@ export default function App() {
                   <button
                     className={`menu-stone-button medium ${gameState.status === "won" ? "secondary" : ""}`}
                     onClick={() => {
-                      setGameState(createInitialState(currentStageId));
+                      setGameState(createInitialState(currentStageId, selectedCharacter));
                       setShowHint(true);
                       setTutorialStep(1);
                       setPauseMenuOpen(false);

@@ -1,5 +1,7 @@
 export type Screen = "menu" | "stages" | "game";
 
+export type CharacterId = "hunter" | "legend24";
+
 export type EnemyKind =
   | "slime"
   | "bat"
@@ -75,6 +77,7 @@ export interface Projectile {
 }
 
 export interface PlayerState {
+  character: CharacterId;
   x: number;
   y: number;
   vx: number;
