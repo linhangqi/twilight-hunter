@@ -1,4 +1,5 @@
 import { StageDefinition } from "../adventure/types";
+import { assetUrl } from "../utils/assets";
 
 interface StageSelectProps {
   stages: StageDefinition[];
@@ -47,7 +48,7 @@ export function StageSelect({
       <div className="panel stage-panel">
         <div className="section-row stage-panel-top">
           <div className="menu-brandline">
-            <img src="/ui/logo-emblem.svg" alt="" />
+            <img src={assetUrl("ui/logo-emblem.svg")} alt="" />
             <div>
               <div className="eyebrow">Available Stages</div>
               <h2>选择下一段征途</h2>

@@ -1,6 +1,7 @@
 import { findPortal, findPrincess } from "./engine";
 import { BIOME_PALETTES, TILE_SIZE, VIEW_HEIGHT, VIEW_WIDTH } from "./stages";
 import { BiomeTheme, EnemyState, GameState, StageDefinition } from "./types";
+import { assetUrl } from "../utils/assets";
 
 const loadImage = (src: string) => {
   const img = new Image();
@@ -11,35 +12,35 @@ const loadImage = (src: string) => {
 const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
 
-const heroSheet  = loadImage("/assets/processed/hero-sheet.png");
-const enemySheet = loadImage("/assets/processed/enemy-sheet.png");
-const envSheet   = loadImage("/assets/processed/environment-sheet.png");
-const princessSprite = loadImage("/assets/generated/story/princess.png");
+const heroSheet  = loadImage(assetUrl("assets/processed/hero-sheet.png"));
+const enemySheet = loadImage(assetUrl("assets/processed/enemy-sheet.png"));
+const envSheet   = loadImage(assetUrl("assets/processed/environment-sheet.png"));
+const princessSprite = loadImage(assetUrl("assets/generated/story/princess.png"));
 const enemyGeneratedSprites = {
-  mummy: loadImage("/assets/generated/enemy-mummy.png"),
-  pharaoh: loadImage("/assets/generated/enemy-pharaoh.png"),
-  gargoyle: loadImage("/assets/generated/enemy-gargoyle.png"),
-  lava_sprite: loadImage("/assets/generated/enemy-lava-sprite.png"),
-  skeleton: loadImage("/assets/generated/enemy-skeleton.png"),
-  dragon: loadImage("/assets/generated/enemy-dragon.png"),
+  mummy: loadImage(assetUrl("assets/generated/enemy-mummy.png")),
+  pharaoh: loadImage(assetUrl("assets/generated/enemy-pharaoh.png")),
+  gargoyle: loadImage(assetUrl("assets/generated/enemy-gargoyle.png")),
+  lava_sprite: loadImage(assetUrl("assets/generated/enemy-lava-sprite.png")),
+  skeleton: loadImage(assetUrl("assets/generated/enemy-skeleton.png")),
+  dragon: loadImage(assetUrl("assets/generated/enemy-dragon.png")),
 } as const;
 const biomeBackgrounds: Record<BiomeTheme, HTMLImageElement> = {
-  forest: loadImage("/assets/generated/backgrounds/forest-bg.png"),
-  moonrift: loadImage("/assets/generated/backgrounds/moonrift-bg.png"),
-  desert: loadImage("/assets/generated/backgrounds/desert-bg.png"),
-  jungle: loadImage("/assets/generated/backgrounds/jungle-bg.png"),
-  volcanic: loadImage("/assets/generated/backgrounds/volcanic-bg.png"),
-  ruins: loadImage("/assets/generated/backgrounds/ruins-bg.png"),
-  dragon_lair: loadImage("/assets/generated/backgrounds/dragon-lair-bg.png"),
+  forest: loadImage(assetUrl("assets/generated/backgrounds/forest-bg.png")),
+  moonrift: loadImage(assetUrl("assets/generated/backgrounds/moonrift-bg.png")),
+  desert: loadImage(assetUrl("assets/generated/backgrounds/desert-bg.png")),
+  jungle: loadImage(assetUrl("assets/generated/backgrounds/jungle-bg.png")),
+  volcanic: loadImage(assetUrl("assets/generated/backgrounds/volcanic-bg.png")),
+  ruins: loadImage(assetUrl("assets/generated/backgrounds/ruins-bg.png")),
+  dragon_lair: loadImage(assetUrl("assets/generated/backgrounds/dragon-lair-bg.png")),
 };
 const biomeTiles: Record<BiomeTheme, HTMLImageElement> = {
-  forest: loadImage("/assets/generated/tiles/forest-tile.png"),
-  moonrift: loadImage("/assets/generated/tiles/moonrift-tile.png"),
-  desert: loadImage("/assets/generated/tiles/desert-tile.png"),
-  jungle: loadImage("/assets/generated/tiles/jungle-tile.png"),
-  volcanic: loadImage("/assets/generated/tiles/volcanic-tile.png"),
-  ruins: loadImage("/assets/generated/tiles/ruins-tile.png"),
-  dragon_lair: loadImage("/assets/generated/tiles/dragon-lair-tile.png"),
+  forest: loadImage(assetUrl("assets/generated/tiles/forest-tile.png")),
+  moonrift: loadImage(assetUrl("assets/generated/tiles/moonrift-tile.png")),
+  desert: loadImage(assetUrl("assets/generated/tiles/desert-tile.png")),
+  jungle: loadImage(assetUrl("assets/generated/tiles/jungle-tile.png")),
+  volcanic: loadImage(assetUrl("assets/generated/tiles/volcanic-tile.png")),
+  ruins: loadImage(assetUrl("assets/generated/tiles/ruins-tile.png")),
+  dragon_lair: loadImage(assetUrl("assets/generated/tiles/dragon-lair-tile.png")),
 };
 
 const HERO_FRAMES = [

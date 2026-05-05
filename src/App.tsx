@@ -9,6 +9,7 @@ import { createInitialState } from "./adventure/engine";
 import { getStageById, STAGES } from "./adventure/stages";
 import { Screen, GameState, ProgressState } from "./adventure/types";
 import { useLocalStorage } from "./hooks/useLocalStorage";
+import { assetUrl } from "./utils/assets";
 
 const INITIAL_PROGRESS: ProgressState = { unlockedStage: STAGES.length, completed: [] };
 
@@ -275,7 +276,7 @@ export default function App() {
                   </p>
                   {gameState.status === "won" && currentStageId === STAGES.length && (
                     <div className="final-scene-art">
-                      <img src="/assets/generated/story/final-rescue-scene.png" alt="救出小公主的终章画面" />
+                      <img src={assetUrl("assets/generated/story/final-rescue-scene.png")} alt="救出小公主的终章画面" />
                     </div>
                   )}
                   <div className="result-stats">
