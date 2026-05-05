@@ -521,21 +521,28 @@ const drawPlayer = (ctx: CanvasRenderingContext2D, state: GameState) => {
   const x = player.x - cameraX;
   const y = player.y;
   const flash = player.hurtTimer > 0 && Math.floor(player.hurtTimer * 12) % 2 === 0;
+  const running = Math.abs(player.vx) > 20 && player.onGround;
+  const airborne = !player.onGround;
 
   if (player.character === "legend24" && legend24HeroSprite.complete) {
-    const bobY = Math.abs(player.vx) > 20 && player.onGround ? Math.sin(state.time * 10) * 2.5 : 0;
-    const attackLean = player.attackTimer > 0 ? 0.1 : 0;
+    const bobY = running ? Math.sin(state.time * 11) * 1.8 : 0;
+    const attackLean = player.attackTimer > 0 ? 0.12 : 0;
+    const runLean = running ? Math.sin(state.time * 11) * 0.05 : 0;
+    const jumpLean = airborne ? player.vy * 0.00055 : 0;
+    const scaleY = airborne ? 1.03 : 1;
+    const scaleX = airborne ? 0.97 : 1;
     ctx.save();
     if (flash) ctx.globalAlpha = 0.74;
     ctx.translate(x + player.width / 2, y + player.height / 2);
     if (player.facing < 0) ctx.scale(-1, 1);
-    ctx.rotate(player.facing > 0 ? attackLean : -attackLean);
-    ctx.drawImage(legend24HeroSprite, -42, -50 + bobY, 84, 116);
+    ctx.rotate((player.facing > 0 ? 1 : -1) * (attackLean + runLean + jumpLean));
+    ctx.scale(scaleX, scaleY);
+    ctx.drawImage(legend24HeroSprite, -26, -38 + bobY, 52, 76);
     if (player.attackTimer > 0) {
       ctx.shadowBlur = 14;
       ctx.shadowColor = "#ff9a2f";
-      px(ctx, player.facing > 0 ? 18 : -30, -12, 18, 18, "#ff8a1c", "#ffd27d");
-      px(ctx, player.facing > 0 ? 22 : -26, -8, 10, 10, "#ffb445");
+      px(ctx, player.facing > 0 ? 10 : -18, -10, 12, 12, "#ff8a1c", "#ffd27d");
+      px(ctx, player.facing > 0 ? 13 : -15, -7, 6, 6, "#ffb445");
       ctx.shadowBlur = 0;
     }
     ctx.restore();
@@ -546,17 +553,17 @@ const drawPlayer = (ctx: CanvasRenderingContext2D, state: GameState) => {
     let frame: (typeof HERO_FRAMES)[number] = HERO_FRAMES[0];
     if (player.attackTimer > 0) {
       frame = HERO_FRAMES[3];
-    } else if (Math.abs(player.vx) > 20 && player.onGround) {
+    } else if (airborne) {
+      frame = HERO_FRAMES[2];
+    } else if (running) {
       frame = Math.floor(state.time * 10) % 2 === 0 ? HERO_FRAMES[1] : HERO_FRAMES[2];
     }
     ctx.save();
     if (flash) ctx.globalAlpha = 0.72;
-    if (player.facing < 0) {
-      ctx.translate(x + player.width / 2, 0);
-      ctx.scale(-1, 1);
-      ctx.translate(-(x + player.width / 2), 0);
-    }
-    ctx.drawImage(heroSheet, frame.x, frame.y, frame.width, frame.height, x - 18, y - 8, 64, 64);
+    ctx.translate(x + player.width / 2, y + player.height / 2);
+    if (player.facing < 0) ctx.scale(-1, 1);
+    ctx.rotate(airborne ? player.vy * 0.00045 : running ? Math.sin(state.time * 10) * 0.03 : 0);
+    ctx.drawImage(heroSheet, frame.x, frame.y, frame.width, frame.height, -31, -26 + (running ? Math.sin(state.time * 10) * 1.2 : 0), 64, 64);
     ctx.restore();
   } else {
     px(ctx, x + 8,  y,      10, 10, flash ? "#fff4ef" : "#ffd9bc");
