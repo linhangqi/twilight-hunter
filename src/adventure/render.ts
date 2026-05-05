@@ -13,7 +13,7 @@ const clamp = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
 
 const heroSheet  = loadImage(assetUrl("assets/processed/hero-sheet.png"));
-const legend24HeroSprite = loadImage(assetUrl("assets/generated/characters/legend24-hero.png"));
+const manActionSheet = loadImage(assetUrl("assets/generated/characters/man-action-sheet.png"));
 const enemySheet = loadImage(assetUrl("assets/processed/enemy-sheet.png"));
 const envSheet   = loadImage(assetUrl("assets/processed/environment-sheet.png"));
 const princessSprite = loadImage(assetUrl("assets/generated/story/princess.png"));
@@ -50,6 +50,15 @@ const HERO_FRAMES = [
   { x: 992,  y: 178, width: 333, height: 403 },
   { x: 1431, y: 207, width: 508, height: 373 },
 ] as const;
+
+const MAN_SHEET_FRAME_WIDTH = 543;
+const MAN_SHEET_FRAME_HEIGHT = 724;
+const MAN_FRAMES = {
+  idle: { x: 0, y: 0, width: MAN_SHEET_FRAME_WIDTH, height: MAN_SHEET_FRAME_HEIGHT, drawWidth: 64, drawHeight: 88, offsetX: -19, offsetY: -10 },
+  run: { x: MAN_SHEET_FRAME_WIDTH, y: 0, width: MAN_SHEET_FRAME_WIDTH, height: MAN_SHEET_FRAME_HEIGHT, drawWidth: 68, drawHeight: 86, offsetX: -21, offsetY: -8 },
+  jump: { x: MAN_SHEET_FRAME_WIDTH * 2, y: 0, width: MAN_SHEET_FRAME_WIDTH, height: MAN_SHEET_FRAME_HEIGHT, drawWidth: 62, drawHeight: 86, offsetX: -18, offsetY: -16 },
+  attack: { x: MAN_SHEET_FRAME_WIDTH * 3, y: 0, width: MAN_SHEET_FRAME_WIDTH, height: MAN_SHEET_FRAME_HEIGHT, drawWidth: 74, drawHeight: 88, offsetX: -22, offsetY: -10 },
+} as const;
 
 const ENEMY_FRAMES = {
   slime: { x: 99,   y: 343, width: 424, height: 255 },
@@ -524,63 +533,33 @@ const drawPlayer = (ctx: CanvasRenderingContext2D, state: GameState) => {
   const running = Math.abs(player.vx) > 20 && player.onGround;
   const airborne = !player.onGround;
 
-  if (player.character === "legend24" && legend24HeroSprite.complete) {
-    const idleFloat = !running && !airborne ? Math.sin(state.time * 2.8) * 1.2 : 0;
-    const bobY = running ? Math.sin(state.time * 11) * 1.8 : idleFloat;
-    const attackProgress =
+  if (player.character === "legend24" && manActionSheet.complete) {
+    const frame =
       player.attackTimer > 0
-        ? 1 - player.attackTimer / 0.22
-        : 0;
-    const runCycle = Math.sin(state.time * 11);
-    const attackLean = player.attackTimer > 0 ? 0.28 - attackProgress * 0.16 : 0;
-    const runLean = running ? runCycle * 0.08 : 0;
-    const jumpLean = airborne ? player.vy * 0.00075 : 0;
-    const attackShiftX = player.attackTimer > 0 ? 5 + attackProgress * 7 : 0;
-    const attackShiftY = player.attackTimer > 0 ? -4 + attackProgress * 5 : 0;
-    const drawWidth = player.attackTimer > 0 ? 56 : airborne ? 50 : running ? 51 : 50;
-    const drawHeight = player.attackTimer > 0 ? 80 : airborne ? 74 : running ? 74 : 72;
-    const drawX = -drawWidth / 2 + attackShiftX;
-    const drawY = -drawHeight / 2 - 1 + bobY + attackShiftY;
-    const scaleY = airborne ? 1.05 : running ? 0.98 + Math.abs(runCycle) * 0.03 : 1.01;
-    const scaleX = airborne ? 0.95 : running ? 1.01 + Math.abs(runCycle) * 0.02 : 0.99;
+        ? MAN_FRAMES.attack
+        : airborne
+          ? MAN_FRAMES.jump
+          : running
+            ? MAN_FRAMES.run
+            : MAN_FRAMES.idle;
     ctx.save();
     if (flash) ctx.globalAlpha = 0.74;
-    ctx.translate(x + player.width / 2, y + player.height / 2);
-    if (player.facing < 0) ctx.scale(-1, 1);
-    ctx.rotate((player.facing > 0 ? 1 : -1) * (attackLean + runLean + jumpLean));
-    ctx.scale(scaleX, scaleY);
-    if (running) {
-      ctx.globalAlpha = 0.16;
-      ctx.drawImage(legend24HeroSprite, drawX - 4, drawY + 1, drawWidth, drawHeight);
-      ctx.globalAlpha = flash ? 0.74 : 1;
+    if (player.facing < 0) {
+      ctx.translate(x + player.width / 2, 0);
+      ctx.scale(-1, 1);
+      ctx.translate(-(x + player.width / 2), 0);
     }
-    if (player.attackTimer > 0) {
-      ctx.globalAlpha = 0.2;
-      ctx.drawImage(legend24HeroSprite, drawX - 6, drawY + 3, drawWidth, drawHeight);
-      ctx.globalAlpha = flash ? 0.74 : 1;
-    }
-    ctx.drawImage(legend24HeroSprite, drawX, drawY, drawWidth, drawHeight);
-    if (player.attackTimer > 0) {
-      const dir = player.facing > 0 ? 1 : -1;
-      const arcX = dir > 0 ? 14 : -30;
-      const arcY = -18 + attackProgress * 14;
-      ctx.globalAlpha = 0.88;
-      ctx.shadowBlur = 18;
-      ctx.shadowColor = "#ff9a2f";
-      px(ctx, arcX, arcY, 14, 14, "#ff8a1c", "#ffd27d");
-      px(ctx, arcX + dir * 8, arcY + 4, 12, 12, "#ffb445", "#ffe5a8");
-      px(ctx, arcX + dir * 16, arcY + 8, 10, 10, "#ff6d1f", "#ffd27d");
-      ctx.globalAlpha = 0.45;
-      px(ctx, arcX - dir * 8, arcY - 2, 10, 10, "#ff9e34");
-      px(ctx, arcX - dir * 14, arcY - 6, 8, 8, "#ffbf61");
-      ctx.shadowBlur = 0;
-      ctx.globalAlpha = 1;
-    } else if (airborne) {
-      ctx.globalAlpha = 0.22;
-      px(ctx, -10, 18, 20, 3, "#5ec8ff");
-      px(ctx, -6, 22, 12, 2, "#d7f4ff");
-      ctx.globalAlpha = 1;
-    }
+    ctx.drawImage(
+      manActionSheet,
+      frame.x,
+      frame.y,
+      frame.width,
+      frame.height,
+      x + frame.offsetX,
+      y + frame.offsetY,
+      frame.drawWidth,
+      frame.drawHeight,
+    );
     ctx.restore();
     return;
   }
