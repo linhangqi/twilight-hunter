@@ -235,7 +235,7 @@ export default function App() {
                     重新挑战
                   </button>
                   <button
-                    className="ghost-button small-button result-exit"
+                    className="menu-stone-button medium secondary result-exit"
                     onClick={() => {
                       setPauseMenuOpen(false);
                       setScreen("stages");

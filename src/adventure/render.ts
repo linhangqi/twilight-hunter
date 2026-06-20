@@ -54,10 +54,10 @@ const HERO_FRAMES = [
 const MAN_SHEET_FRAME_WIDTH = 543;
 const MAN_SHEET_FRAME_HEIGHT = 724;
 const MAN_FRAMES = {
-  idle: { x: 0, y: 0, width: MAN_SHEET_FRAME_WIDTH, height: MAN_SHEET_FRAME_HEIGHT, drawWidth: 64, drawHeight: 88, offsetX: -19, offsetY: -10 },
-  run: { x: MAN_SHEET_FRAME_WIDTH, y: 0, width: MAN_SHEET_FRAME_WIDTH, height: MAN_SHEET_FRAME_HEIGHT, drawWidth: 68, drawHeight: 86, offsetX: -21, offsetY: -8 },
-  jump: { x: MAN_SHEET_FRAME_WIDTH * 2, y: 0, width: MAN_SHEET_FRAME_WIDTH, height: MAN_SHEET_FRAME_HEIGHT, drawWidth: 62, drawHeight: 86, offsetX: -18, offsetY: -16 },
-  attack: { x: MAN_SHEET_FRAME_WIDTH * 3, y: 0, width: MAN_SHEET_FRAME_WIDTH, height: MAN_SHEET_FRAME_HEIGHT, drawWidth: 74, drawHeight: 88, offsetX: -22, offsetY: -10 },
+  idle: { x: 0, y: 0, width: MAN_SHEET_FRAME_WIDTH, height: MAN_SHEET_FRAME_HEIGHT, drawWidth: 64, drawHeight: 88, offsetX: -19, offsetY: -48 },
+  run: { x: MAN_SHEET_FRAME_WIDTH, y: 0, width: MAN_SHEET_FRAME_WIDTH, height: MAN_SHEET_FRAME_HEIGHT, drawWidth: 68, drawHeight: 86, offsetX: -21, offsetY: -44 },
+  jump: { x: MAN_SHEET_FRAME_WIDTH * 2, y: 0, width: MAN_SHEET_FRAME_WIDTH, height: MAN_SHEET_FRAME_HEIGHT, drawWidth: 62, drawHeight: 86, offsetX: -18, offsetY: -44 },
+  attack: { x: MAN_SHEET_FRAME_WIDTH * 3, y: 0, width: MAN_SHEET_FRAME_WIDTH, height: MAN_SHEET_FRAME_HEIGHT, drawWidth: 74, drawHeight: 88, offsetX: -22, offsetY: -46 },
 } as const;
 
 const ENEMY_FRAMES = {
