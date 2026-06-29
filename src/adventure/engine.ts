@@ -1,9 +1,7 @@
 import { STAGES, TILE_SIZE, VIEW_WIDTH, resolveTraps } from "./stages";
 import {
   CharacterId,
-  ComboState,
   DamageText,
-  DeathAnimation,
   ElitePrefix,
   EnemyKind,
   EnemyState,
