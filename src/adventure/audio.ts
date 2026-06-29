@@ -4,6 +4,7 @@ let musicMaster: GainNode | null = null;
 let musicStep = 0;
 let musicMode: "menu" | "game" | null = null;
 let musicEnabled = true;
+let musicIntense = false;
 
 const MENU_STEP = 250; // 16th note at 60 BPM
 const GAME_STEP = 150; // 16th note at 100 BPM
@@ -179,6 +180,26 @@ export const playFireballHitSound = (): void => {
   nz("highpass", 2000, 0.5, 0.06, 0.001, 0.1, undefined);
 };
 
+export const playDashSound = (): void => {
+  // Quick whoosh
+  nz("bandpass", 1200, 0.5, 0.08, 0.001, 0.12, undefined);
+  osc(400, 200, "sine", 0.04, 0.002, 0.1, undefined);
+};
+
+export const playComboSound = (count: number): void => {
+  // Rising pitch with combo count
+  const baseFreq = 500 + count * 60;
+  osc(baseFreq, null, "sine", 0.06, 0.002, 0.15, undefined);
+  osc(baseFreq * 1.5, null, "triangle", 0.03, 0.003, 0.1, undefined);
+};
+
+export const playEnemyDeathSound = (): void => {
+  // Satisfying crunch + low boom
+  osc(120, 40, "sine", 0.16, 0.002, 0.25, undefined);
+  nz("bandpass", 400, 2, 0.12, 0.001, 0.12, undefined);
+  nz("highpass", 1500, 0.6, 0.05, 0.001, 0.08, undefined, 0.03);
+};
+
 // ─── BGM ─────────────────────────────────────────────────────────────
 //
 // Menu: Am-Dm-F-E  i-iv-VI-V  60 BPM, 250 ms/16th, 16-step loop
@@ -291,33 +312,44 @@ const playMenuStep = (step: number, bus: GainNode): void => {
   }
 };
 
+// Intense mode patterns — faster, more aggressive
+const G_KICK_INTENSE = [1, _, 1, _, _, _, 1, _, 1, _, 1, _, _, _, 1, _];
+const G_HAT_INTENSE  = [_, 1, 1, _, 1, _, 1, _, _, 1, 1, _, 1, _, 1, _];
+
 const playGameStep = (step: number, bus: GainNode): void => {
   const s = step % 16;
+  const kick = musicIntense ? G_KICK_INTENSE : G_KICK;
+  const hat = musicIntense ? G_HAT_INTENSE : G_HAT;
 
   // Kick
-  if (G_KICK[s]) {
-    osc(90, 28, "sine", 0.55, 0.002, 0.22, bus);
-    nz("lowpass", 180, 1, 0.18, 0.001, 0.09, bus);
+  if (kick[s]) {
+    osc(musicIntense ? 100 : 90, 28, "sine", musicIntense ? 0.6 : 0.55, 0.002, 0.22, bus);
+    nz("lowpass", 180, 1, musicIntense ? 0.22 : 0.18, 0.001, 0.09, bus);
   }
 
   // Hi-hat
-  if (G_HAT[s]) {
-    nz("highpass", 7000, 0.5, 0.08, 0.001, 0.055, bus);
+  if (hat[s]) {
+    nz("highpass", 7000, 0.5, musicIntense ? 0.1 : 0.08, 0.001, 0.055, bus);
   }
 
   // Bass
   if (G_BASS[s]) {
-    osc(G_BASS[s], null, "sawtooth", 0.18, 0.003, 0.28, bus);
+    osc(G_BASS[s], null, "sawtooth", musicIntense ? 0.22 : 0.18, 0.003, 0.28, bus);
   }
 
   // Lead melody
   if (G_LEAD_16[s]) {
-    osc(G_LEAD_16[s], null, "triangle", 0.16, 0.005, 0.28, bus);
+    osc(G_LEAD_16[s], null, "triangle", musicIntense ? 0.2 : 0.16, 0.005, 0.28, bus);
   }
 
   // Arpeggio (every step — creates drive)
   if (G_ARP[s]) {
-    osc(G_ARP[s], null, "triangle", 0.05, 0.003, 0.14, bus);
+    osc(G_ARP[s], null, "triangle", musicIntense ? 0.07 : 0.05, 0.003, 0.14, bus);
+  }
+
+  // Extra tension layer in intense mode
+  if (musicIntense && s % 4 === 0) {
+    osc(G_BASS[s] ? G_BASS[s] * 2 : 220, null, "square", 0.03, 0.002, 0.12, bus);
   }
 };
 
@@ -373,4 +405,8 @@ export const setMusicEnabled = (enabled: boolean): void => {
   if (!enabled) {
     stopBackgroundMusic();
   }
+};
+
+export const setMusicIntensity = (intense: boolean): void => {
+  musicIntense = intense;
 };

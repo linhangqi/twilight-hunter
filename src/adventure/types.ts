@@ -1,4 +1,4 @@
-export type Screen = "menu" | "stages" | "game";
+export type Screen = "menu" | "stages" | "game" | "stage_intro" | "upgrade";
 
 export type CharacterId = "hunter" | "legend24";
 
@@ -22,22 +22,43 @@ export type BiomeTheme =
   | "ruins"
   | "dragon_lair";
 
+export type ElitePrefix = "swift" | "tough" | "fierce";
+
+export type TrapKind = "spike" | "lava";
+
 export interface StageDefinition {
   id: number;
   name: string;
   biome: string;
   theme: BiomeTheme;
   hint: string;
+  intro?: string;
   tutorialSteps?: string[];
   map: string[];
   enemySpawns: EnemySpawn[];
   crystalsNeeded: number;
+  traps?: TrapDefinition[];
+}
+
+export interface TrapDefinition {
+  kind: TrapKind;
+  col: number;
+  colSpan: number;
+}
+
+export interface ResolvedTrap {
+  kind: TrapKind;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export interface EnemySpawn {
   kind: EnemyKind;
   x: number;
   y: number;
+  elite?: ElitePrefix;
 }
 
 export interface Vec2 {
@@ -53,6 +74,38 @@ export interface Particle {
   life: number;
   color: string;
   size: number;
+}
+
+export interface DamageText {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  value: number;
+  life: number;
+  color: string;
+}
+
+export interface ScreenShake {
+  intensity: number;
+  timer: number;
+}
+
+export interface ComboState {
+  count: number;
+  timer: number;
+}
+
+export interface ForegroundParticle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  size: number;
+  color: string;
+  type: "leaf" | "bird" | "ember" | "dust";
 }
 
 export interface Pickup {
@@ -76,6 +129,23 @@ export interface Projectile {
   life: number;
 }
 
+export interface DeathAnimation {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  timer: number;
+  kind: EnemyKind;
+  color: string;
+}
+
+export interface PassiveUpgrade {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+}
+
 export interface PlayerState {
   character: CharacterId;
   x: number;
@@ -93,6 +163,10 @@ export interface PlayerState {
   hurtTimer: number;
   crystals: number;
   jumpsUsed: number;
+  dashTimer: number;
+  dashCooldown: number;
+  dashDirection: 1 | -1;
+  attackRange: number;
 }
 
 export interface EnemyState {
@@ -117,6 +191,7 @@ export interface EnemyState {
   chargeTimer: number;
   jumpCooldown: number;
   phase: number;
+  elite: ElitePrefix | null;
 }
 
 export interface GameState {
@@ -126,6 +201,11 @@ export interface GameState {
   particles: Particle[];
   pickups: Pickup[];
   projectiles: Projectile[];
+  damageTexts: DamageText[];
+  screenShake: ScreenShake;
+  combo: ComboState;
+  deathAnimations: DeathAnimation[];
+  foregroundParticles: ForegroundParticle[];
   cameraX: number;
   status: "playing" | "won" | "lost";
   time: number;
@@ -137,9 +217,12 @@ export interface InputState {
   jump: boolean;
   jumpPressed: boolean;
   attack: boolean;
+  dash: boolean;
+  dashPressed: boolean;
 }
 
 export interface ProgressState {
   unlockedStage: number;
   completed: number[];
+  passives: string[];
 }

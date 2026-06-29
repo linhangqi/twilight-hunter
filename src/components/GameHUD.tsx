@@ -6,6 +6,7 @@ interface GameHUDProps {
   crystals: number;
   crystalsNeeded: number;
   enemiesLeft: number;
+  dashCooldown?: number;
 }
 
 export function GameHUD({
@@ -14,7 +15,11 @@ export function GameHUD({
   crystals,
   crystalsNeeded,
   enemiesLeft,
+  dashCooldown = 0,
 }: GameHUDProps) {
+  const dashReady = dashCooldown <= 0;
+  const dashPercent = dashReady ? 100 : Math.max(0, (1 - dashCooldown / 0.6) * 100);
+
   return (
     <>
       <div className="hud-corner hud-top-left">
@@ -26,6 +31,13 @@ export function GameHUD({
               alt=""
             />
           ))}
+        </div>
+        <div className="dash-bar-wrap">
+          <div
+            className={`dash-bar-fill ${dashReady ? "ready" : ""}`}
+            style={{ width: `${dashPercent}%` }}
+          />
+          <span className="dash-bar-label">{dashReady ? "Shift 冲刺" : ""}</span>
         </div>
       </div>
 

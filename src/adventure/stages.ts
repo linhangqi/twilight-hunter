@@ -1,4 +1,4 @@
-import { BiomeTheme, StageDefinition } from "./types";
+import { BiomeTheme, ResolvedTrap, StageDefinition } from "./types";
 
 export const TILE_SIZE = 32;
 export const VIEW_WIDTH = 960;
@@ -123,6 +123,7 @@ export const STAGES: StageDefinition[] = [
     name: "苔坡前哨",
     biome: "Forest Verge",
     theme: "forest",
+    intro: "暮色降临，猎人踏入了被遗忘的苔坡前哨。裂隙中涌出的怪物已经侵蚀了这片古老的森林……",
     hint: "先熟悉移动、跳跃和挥砍，消灭史莱姆后收集晶核进入传送门。",
     tutorialSteps: [
       "← A / D 或方向键 移动 →",
@@ -151,6 +152,7 @@ export const STAGES: StageDefinition[] = [
     name: "月井裂隙",
     biome: "Moonwell Rift",
     theme: "moonrift",
+    intro: "月光穿透了裂隙，照亮了通往深层的阶梯。空气中弥漫着不安的低语，蝙蝠的阴影掠过头顶……",
     hint: "两段高台需要连续跳跃，蝙蝠会从空中偷袭，石魔则会在落点附近拦截你。",
     crystalsNeeded: 3,
     map: buildMap(
@@ -179,6 +181,7 @@ export const STAGES: StageDefinition[] = [
     name: "焦土沙海",
     biome: "Scorched Sands",
     theme: "desert",
+    intro: "沙漠的热浪扑面而来，古老的金字塔群隐没在沙暴之后。小心脚下的尖刺陷阱——这是法老留下的守卫。",
     hint: "木乃伊行动迟缓但耐打，法老会发射能量弹，注意躲避。",
     crystalsNeeded: 5,
     map: buildMap(
@@ -206,6 +209,11 @@ export const STAGES: StageDefinition[] = [
       { kind: "mummy",  x: 940,  y: 100 },
       { kind: "pharaoh", x: 1150, y: 100 },
     ],
+    traps: [
+      { kind: "spike", col: 9, colSpan: 3 },
+      { kind: "spike", col: 17, colSpan: 3 },
+      { kind: "spike", col: 25, colSpan: 3 },
+    ],
   },
 
   // ── 4: 绿渊秘境 · Jungle + Gargoyles ───────────────────────────────────────
@@ -214,6 +222,7 @@ export const STAGES: StageDefinition[] = [
     name: "绿渊秘境",
     biome: "Deep Jungle",
     theme: "jungle",
+    intro: "密林深处传来石翼拍击的声响。石像鬼在树冠间盘旋，地面上长满了致命的藤刺……",
     hint: "石像鬼会在高处盘旋后突然俯冲，穿越丛林台地时不要停在边缘。",
     crystalsNeeded: 3,
     map: buildMap(
@@ -238,8 +247,12 @@ export const STAGES: StageDefinition[] = [
     ),
     enemySpawns: [
       { kind: "gargoyle", x: 320,  y: 80  },
-      { kind: "gargoyle", x: 760,  y: 80  },
+      { kind: "gargoyle", x: 760,  y: 80, elite: "swift" },
       { kind: "gargoyle", x: 1260, y: 80  },
+    ],
+    traps: [
+      { kind: "spike", col: 9, colSpan: 3 },
+      { kind: "spike", col: 25, colSpan: 3 },
     ],
   },
 
@@ -249,6 +262,7 @@ export const STAGES: StageDefinition[] = [
     name: "熔核炉道",
     biome: "Magma Forge",
     theme: "volcanic",
+    intro: "地底的岩浆涌上了地表，炽热的红光映照出无数蠕动的火焰精灵。脚下的熔岩地面会灼伤一切生物。",
     hint: "岩浆精灵速度极快，击杀后还会喷发火焰，出刀后立刻横移。",
     crystalsNeeded: 5,
     map: buildMap(
@@ -271,10 +285,15 @@ export const STAGES: StageDefinition[] = [
     ),
     enemySpawns: [
       { kind: "lava_sprite", x: 260,  y: 100 },
-      { kind: "lava_sprite", x: 500,  y: 100 },
+      { kind: "lava_sprite", x: 500,  y: 100, elite: "fierce" },
       { kind: "lava_sprite", x: 760,  y: 100 },
-      { kind: "lava_sprite", x: 1020, y: 100 },
+      { kind: "lava_sprite", x: 1020, y: 100, elite: "tough" },
       { kind: "lava_sprite", x: 1280, y: 100 },
+    ],
+    traps: [
+      { kind: "lava", col: 8, colSpan: 2 },
+      { kind: "lava", col: 14, colSpan: 2 },
+      { kind: "lava", col: 27, colSpan: 2 },
     ],
   },
 
@@ -284,6 +303,7 @@ export const STAGES: StageDefinition[] = [
     name: "枯骨城寨",
     biome: "Blightbone Keep",
     theme: "ruins",
+    intro: "残破的城墙上覆满了暗紫色的苔藓。骷髅骑士们列阵守卫，盾牌在月光下泛着幽光。",
     hint: "骷髅骑士正面会用盾格挡，先绕背或连续打碎盾牌，再完成处决。",
     crystalsNeeded: 6,
     map: buildMap(
@@ -299,9 +319,13 @@ export const STAGES: StageDefinition[] = [
       45,
     ),
     enemySpawns: [
-      { kind: "skeleton",  x: 300,  y: 100 },
+      { kind: "skeleton",  x: 300,  y: 100, elite: "tough" },
       { kind: "skeleton",  x: 760,  y: 100 },
-      { kind: "skeleton",  x: 1220, y: 100 },
+      { kind: "skeleton",  x: 1220, y: 100, elite: "swift" },
+    ],
+    traps: [
+      { kind: "spike", col: 7, colSpan: 2 },
+      { kind: "spike", col: 29, colSpan: 2 },
     ],
   },
 
@@ -311,6 +335,7 @@ export const STAGES: StageDefinition[] = [
     name: "深渊龙巢",
     biome: "Abyssal Lair",
     theme: "dragon_lair",
+    intro: "终焉之地。暗影龙的低吼回荡在紫色的虚空中，被囚禁的公主正等待着最后的救赎……",
     hint: "暗影龙进入二阶段后会一次连发三枚火球，看到紫光爆发后立刻准备横向拉开。",
     crystalsNeeded: 4,
     map: buildMap(
@@ -336,3 +361,39 @@ export const STAGES: StageDefinition[] = [
 
 export const getStageById = (stageId: number) =>
   STAGES.find((stage) => stage.id === stageId) ?? STAGES[0];
+
+// Resolve column-based trap defs to pixel rects by scanning the map for ground surface
+const trapCache = new Map<string, ResolvedTrap[]>();
+export const resolveTraps = (stage: StageDefinition): ResolvedTrap[] => {
+  if (!stage.traps || stage.traps.length === 0) return [];
+  const key = `${stage.id}-${stage.traps.map(t => `${t.col}:${t.colSpan}`).join(",")}`;
+  const cached = trapCache.get(key);
+  if (cached) return cached;
+
+  const result = stage.traps.map((trap) => {
+    const SPIKE_HEIGHT = 10;
+    const LAVA_HEIGHT = 6;
+    const h = trap.kind === "lava" ? LAVA_HEIGHT : SPIKE_HEIGHT;
+    const x = trap.col * TILE_SIZE;
+    const width = trap.colSpan * TILE_SIZE;
+
+    // Find the ground surface Y at the first column of the trap
+    let groundY = stage.map.length * TILE_SIZE;
+    for (let row = 0; row < stage.map.length; row++) {
+      if (trap.col < stage.map[row].length && stage.map[row][trap.col] === "#") {
+        groundY = row * TILE_SIZE;
+        break;
+      }
+    }
+
+    return {
+      kind: trap.kind,
+      x,
+      y: groundY - h,
+      width,
+      height: h,
+    };
+  });
+  trapCache.set(key, result);
+  return result;
+};

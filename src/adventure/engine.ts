@@ -1,14 +1,20 @@
-import { STAGES, TILE_SIZE, VIEW_WIDTH } from "./stages";
+import { STAGES, TILE_SIZE, VIEW_WIDTH, resolveTraps } from "./stages";
 import {
   CharacterId,
+  ComboState,
+  DamageText,
+  DeathAnimation,
+  ElitePrefix,
   EnemyKind,
   EnemyState,
+  ForegroundParticle,
   GameState,
   InputState,
   Particle,
   Pickup,
   Projectile,
   PlayerState,
+  ScreenShake,
   StageDefinition,
 } from "./types";
 
@@ -21,6 +27,19 @@ const PLAYER_ATTACK_WINDOW = 0.22;
 const PLAYER_ATTACK_COOLDOWN = 0.34;
 const PLAYER_INVULN = 0.55;
 const ENEMY_JUMP_PLAYER_RANGE = 220;
+
+// Dash constants
+const DASH_SPEED = 600;
+const DASH_DURATION = 0.15;
+const DASH_COOLDOWN = 0.6;
+const DASH_INVULN = 0.2;
+
+// Combo constants
+const COMBO_TIMEOUT = 1.5;
+
+// Trap constants
+const TRAP_DAMAGE_COOLDOWN = 0.8;
+let trapDamageCooldown = 0;
 
 let projectileIdCounter = 10000;
 
@@ -48,19 +67,66 @@ const enemyStats = (kind: EnemyKind) => {
   }
 };
 
+// ─── Elite modifiers ─────────────────────────────────────────────────────────
+
+const applyEliteModifiers = (
+  stats: ReturnType<typeof enemyStats>,
+  elite: ElitePrefix | null,
+) => {
+  if (!elite) return stats;
+  const s = { ...stats };
+  switch (elite) {
+    case "swift":
+      s.speed = Math.round(s.speed * 1.5);
+      s.health = Math.round(s.health * 1.2);
+      break;
+    case "tough":
+      s.health = s.health * 2;
+      s.speed = Math.round(s.speed * 0.85);
+      break;
+    case "fierce":
+      s.damage = s.damage + 1;
+      s.health = Math.round(s.health * 1.5);
+      s.speed = Math.round(s.speed * 1.2);
+      break;
+  }
+  return s;
+};
+
+// ─── Passive upgrade helpers ─────────────────────────────────────────────────
+
+export const PASSIVE_UPGRADES = [
+  { id: "extra_life", name: "+1 生命上限", description: "最大生命值提升 1 点", icon: "❤" },
+  { id: "attack_range", name: "延长攻击范围", description: "攻击距离增大 30%", icon: "⚔" },
+  { id: "dash_reset", name: "冲刺冷却减半", description: "冲刺冷却时间降低 50%", icon: "💨" },
+  { id: "combo_extend", name: "连击延长", description: "连击超时时间增加 1 秒", icon: "🔥" },
+  { id: "crystal_magnet", name: "晶核吸附", description: "晶核拾取范围增大 80%", icon: "✦" },
+];
+
+export const getRandomUpgradeChoices = (owned: string[], count = 3) => {
+  const available = PASSIVE_UPGRADES.filter((u) => !owned.includes(u.id));
+  const shuffled = available.sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+};
+
 // ─── Factories ────────────────────────────────────────────────────────────────
 
-const createPlayer = (character: CharacterId): PlayerState => ({
+const createPlayer = (character: CharacterId, passives: string[] = []): PlayerState => ({
   character,
   x: 84, y: 220,
   vx: 0, vy: 0,
   width: 26, height: 38,
-  health: 5, maxHealth: 5,
+  health: 5 + (passives.includes("extra_life") ? 1 : 0),
+  maxHealth: 5 + (passives.includes("extra_life") ? 1 : 0),
   facing: 1,
   onGround: false,
   attackTimer: 0, attackCooldown: 0, hurtTimer: 0,
   crystals: 0,
   jumpsUsed: 0,
+  dashTimer: 0,
+  dashCooldown: 0,
+  dashDirection: 1,
+  attackRange: passives.includes("attack_range") ? 49 : 38,
 });
 
 const createEnemy = (
@@ -68,7 +134,9 @@ const createEnemy = (
   spawn: StageDefinition["enemySpawns"][number],
   index: number,
 ): EnemyState => {
-  const stats = enemyStats(spawn.kind);
+  const baseStats = enemyStats(spawn.kind);
+  const elite = spawn.elite ?? null;
+  const stats = applyEliteModifiers(baseStats, elite);
   return {
     id: stage.id * 100 + index,
     kind: spawn.kind,
@@ -86,22 +154,28 @@ const createEnemy = (
     stunTimer: 0,
     attackCooldown: 0,
     alive: true,
-    shieldHp: spawn.kind === "skeleton" ? 2 : 0,
+    shieldHp: spawn.kind === "skeleton" ? (elite === "tough" ? 4 : 2) : 0,
     chargeTimer: spawn.kind === "pharaoh" ? 3.5 : spawn.kind === "dragon" ? 4 : 0,
     jumpCooldown: 0,
     phase: 1,
+    elite,
   };
 };
 
-export const createInitialState = (stageId: number, character: CharacterId = "hunter"): GameState => {
+export const createInitialState = (stageId: number, character: CharacterId = "hunter", passives: string[] = []): GameState => {
   const stage = STAGES.find((s) => s.id === stageId) ?? STAGES[0];
   return {
     stageId: stage.id,
-    player: createPlayer(character),
+    player: createPlayer(character, passives),
     enemies: stage.enemySpawns.map((spawn, i) => createEnemy(stage, spawn, i)),
     particles: [],
     pickups: [],
     projectiles: [],
+    damageTexts: [],
+    screenShake: { intensity: 0, timer: 0 },
+    combo: { count: 0, timer: 0 },
+    deathAnimations: [],
+    foregroundParticles: [],
     cameraX: 0,
     status: "playing",
     time: 0,
@@ -283,6 +357,26 @@ const spawnBurst = (
   }
 };
 
+// Death explosion burst — more particles, larger, longer life
+const spawnDeathBurst = (
+  target: Particle[], x: number, y: number, w: number, h: number, color: string,
+) => {
+  for (let i = 0; i < 24; i++) {
+    const angle = (Math.PI * 2 * i) / 24 + Math.random() * 0.3;
+    const speed = 80 + Math.random() * 180;
+    const ox = (Math.random() - 0.5) * w * 0.6;
+    const oy = (Math.random() - 0.5) * h * 0.6;
+    target.push({
+      x: x + ox, y: y + oy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 80,
+      life: 0.6 + Math.random() * 0.6,
+      color,
+      size: 4 + Math.random() * 6,
+    });
+  }
+};
+
 const spawnPickup = (drops: Pickup[], enemy: EnemyState) => {
   const push = (offsetX: number, offsetY: number, vy: number, type: "crystal" | "heart", idx: number) => {
     drops.push({
@@ -323,6 +417,122 @@ const spawnPickup = (drops: Pickup[], enemy: EnemyState) => {
   }
 };
 
+// ─── Damage text ─────────────────────────────────────────────────────────────
+
+const spawnDamageText = (
+  texts: DamageText[], x: number, y: number, value: number, color = "#fff",
+) => {
+  texts.push({
+    x, y,
+    vx: (Math.random() - 0.5) * 40,
+    vy: -120 - Math.random() * 40,
+    value,
+    life: 0.8,
+    color,
+  });
+};
+
+// ─── Screen shake ────────────────────────────────────────────────────────────
+
+const triggerShake = (shake: ScreenShake, intensity: number, duration: number) => {
+  shake.intensity = Math.max(shake.intensity, intensity);
+  shake.timer = Math.max(shake.timer, duration);
+};
+
+// ─── Foreground particles ────────────────────────────────────────────────────
+
+const spawnForegroundParticles = (
+  particles: ForegroundParticle[],
+  theme: string,
+  cameraX: number,
+  viewWidth: number,
+  viewHeight: number,
+) => {
+  // Limit count
+  if (particles.length > 30) return;
+
+  const rand = Math.random();
+  switch (theme) {
+    case "forest":
+    case "jungle":
+      if (rand < 0.03) {
+        particles.push({
+          x: cameraX + Math.random() * viewWidth,
+          y: -10,
+          vx: -15 - Math.random() * 25,
+          vy: 30 + Math.random() * 20,
+          life: 4 + Math.random() * 3,
+          maxLife: 7,
+          size: 4 + Math.random() * 4,
+          color: theme === "forest" ? "#6ca14b" : "#3a8c28",
+          type: "leaf",
+        });
+      }
+      break;
+    case "moonrift":
+      if (rand < 0.015) {
+        particles.push({
+          x: cameraX + Math.random() * viewWidth,
+          y: viewHeight * 0.3 + Math.random() * viewHeight * 0.4,
+          vx: 20 + Math.random() * 40,
+          vy: -5 + Math.random() * 10,
+          life: 3 + Math.random() * 2,
+          maxLife: 5,
+          size: 2 + Math.random() * 2,
+          color: "#aabbff",
+          type: "dust",
+        });
+      }
+      break;
+    case "desert":
+      if (rand < 0.04) {
+        particles.push({
+          x: cameraX + viewWidth + 10,
+          y: Math.random() * viewHeight * 0.5,
+          vx: -40 - Math.random() * 30,
+          vy: 5 + Math.random() * 8,
+          life: 3 + Math.random() * 2,
+          maxLife: 5,
+          size: 2 + Math.random() * 2,
+          color: "#d4a060",
+          type: "dust",
+        });
+      }
+      break;
+    case "volcanic":
+    case "dragon_lair":
+      if (rand < 0.05) {
+        particles.push({
+          x: cameraX + Math.random() * viewWidth,
+          y: viewHeight + 10,
+          vx: (Math.random() - 0.5) * 30,
+          vy: -40 - Math.random() * 60,
+          life: 1.5 + Math.random() * 2,
+          maxLife: 3.5,
+          size: 2 + Math.random() * 3,
+          color: theme === "volcanic" ? (Math.random() < 0.5 ? "#ff6020" : "#ffaa20") : "#a030ff",
+          type: "ember",
+        });
+      }
+      break;
+    case "ruins":
+      if (rand < 0.01) {
+        particles.push({
+          x: cameraX - 20,
+          y: Math.random() * viewHeight * 0.3,
+          vx: 30 + Math.random() * 20,
+          vy: -2 + Math.random() * 4,
+          life: 4 + Math.random() * 3,
+          maxLife: 7,
+          size: 3,
+          color: "#555566",
+          type: "bird",
+        });
+      }
+      break;
+  }
+};
+
 // ─── Projectile helpers ───────────────────────────────────────────────────────
 
 const fireProjectile = (
@@ -349,6 +559,7 @@ export const updateGame = (
   stage: StageDefinition,
   input: InputState,
   dt: number,
+  passives: string[] = [],
 ): GameState => {
   const state: GameState = {
     ...current,
@@ -357,6 +568,11 @@ export const updateGame = (
     particles: current.particles.map((p) => ({ ...p })),
     pickups: current.pickups.map((pk) => ({ ...pk })),
     projectiles: current.projectiles.map((pr) => ({ ...pr })),
+    damageTexts: current.damageTexts.map((t) => ({ ...t })),
+    screenShake: { ...current.screenShake },
+    combo: { ...current.combo },
+    deathAnimations: current.deathAnimations.map((d) => ({ ...d })),
+    foregroundParticles: current.foregroundParticles.map((fp) => ({ ...fp })),
     time: current.time + dt,
   };
 
@@ -365,6 +581,14 @@ export const updateGame = (
     state.particles = state.particles
       .map((p) => ({ ...p, x: p.x + p.vx * dt, y: p.y + p.vy * dt, vy: p.vy + GRAVITY * 0.35 * dt, life: p.life - dt }))
       .filter((p) => p.life > 0);
+    state.damageTexts = state.damageTexts
+      .map((t) => ({ ...t, x: t.x + t.vx * dt, y: t.y + t.vy * dt, life: t.life - dt }))
+      .filter((t) => t.life > 0);
+    state.deathAnimations = state.deathAnimations
+      .map((d) => ({ ...d, timer: d.timer - dt }))
+      .filter((d) => d.timer > 0);
+    state.screenShake.timer = Math.max(0, state.screenShake.timer - dt);
+    if (state.screenShake.timer <= 0) state.screenShake.intensity = 0;
     return state;
   }
 
@@ -372,17 +596,44 @@ export const updateGame = (
   player.attackCooldown = Math.max(0, player.attackCooldown - dt);
   player.attackTimer    = Math.max(0, player.attackTimer - dt);
   player.hurtTimer      = Math.max(0, player.hurtTimer - dt);
+  player.dashTimer      = Math.max(0, player.dashTimer - dt);
+  player.dashCooldown   = Math.max(0, player.dashCooldown - dt);
+  trapDamageCooldown    = Math.max(0, trapDamageCooldown - dt);
+
+  // Screen shake decay
+  state.screenShake.timer = Math.max(0, state.screenShake.timer - dt);
+  if (state.screenShake.timer <= 0) state.screenShake.intensity = 0;
+
+  // Combo decay
+  const comboTimeout = COMBO_TIMEOUT + (passives.includes("combo_extend") ? 1 : 0);
+  state.combo.timer = Math.max(0, state.combo.timer - dt);
+  if (state.combo.timer <= 0) state.combo.count = 0;
+
+  // ── Dash ──────────────────────────────────────────────────────────────────
+
+  const dashCd = passives.includes("dash_reset") ? DASH_COOLDOWN * 0.5 : DASH_COOLDOWN;
+  if (input.dashPressed && player.dashCooldown <= 0 && player.dashTimer <= 0) {
+    player.dashTimer = DASH_DURATION;
+    player.dashCooldown = dashCd;
+    player.dashDirection = player.facing;
+    player.hurtTimer = Math.max(player.hurtTimer, DASH_INVULN);
+  }
 
   // Player movement
-  if (input.left)  { player.vx -= MOVE_ACCEL * dt; player.facing = -1; }
-  if (input.right) { player.vx += MOVE_ACCEL * dt; player.facing =  1; }
-  if (!input.left && !input.right) {
-    const slow = Math.min(Math.abs(player.vx), FRICTION * dt);
-    player.vx -= Math.sign(player.vx) * slow;
+  if (player.dashTimer > 0) {
+    // During dash: override velocity
+    player.vx = player.dashDirection * DASH_SPEED;
+  } else {
+    if (input.left)  { player.vx -= MOVE_ACCEL * dt; player.facing = -1; }
+    if (input.right) { player.vx += MOVE_ACCEL * dt; player.facing =  1; }
+    if (!input.left && !input.right) {
+      const slow = Math.min(Math.abs(player.vx), FRICTION * dt);
+      player.vx -= Math.sign(player.vx) * slow;
+    }
+    player.vx = clamp(player.vx, -MAX_MOVE_SPEED, MAX_MOVE_SPEED);
   }
-  player.vx = clamp(player.vx, -MAX_MOVE_SPEED, MAX_MOVE_SPEED);
 
-  if (input.jumpPressed && (player.onGround || player.jumpsUsed < 2)) {
+  if (input.jumpPressed && player.dashTimer <= 0 && (player.onGround || player.jumpsUsed < 2)) {
     player.vy = -JUMP_SPEED;
     player.onGround = false;
     player.jumpsUsed++;
@@ -399,19 +650,42 @@ export const updateGame = (
   if (player.y > stage.map.length * TILE_SIZE + 120) player.health = 0;
 
   const attackActive = player.attackTimer > 0;
+  const atkRange = player.attackRange;
   const attackBox = {
-    x: player.x + (player.facing > 0 ? player.width - 4 : -34),
+    x: player.x + (player.facing > 0 ? player.width - 4 : -atkRange + 4),
     y: player.y + 6,
-    width: 38,
+    width: atkRange,
     height: player.height - 10,
   };
+
+  // ── Trap collision ────────────────────────────────────────────────────────
+
+  const resolvedTraps = resolveTraps(stage);
+  if (resolvedTraps.length > 0 && player.hurtTimer <= 0 && trapDamageCooldown <= 0) {
+    for (const trap of resolvedTraps) {
+      if (rectsOverlap(player.x, player.y, player.width, player.height,
+                       trap.x, trap.y, trap.width, trap.height)) {
+        const dmg = trap.kind === "lava" ? 2 : 1;
+        player.health -= dmg;
+        player.hurtTimer = PLAYER_INVULN;
+        trapDamageCooldown = TRAP_DAMAGE_COOLDOWN;
+        player.vy = -280;
+        spawnBurst(state.particles, player.x + player.width / 2, player.y + player.height,
+                   trap.kind === "lava" ? "#ff4400" : "#ff8f9f", 8);
+        triggerShake(state.screenShake, 4, 0.15);
+        spawnDamageText(state.damageTexts, player.x + player.width / 2, player.y, dmg, "#ff4444");
+        break;
+      }
+    }
+  }
 
   // ── Enemy updates ───────────────────────────────────────────────────────────
 
   state.enemies.forEach((enemy) => {
     if (!enemy.alive) return;
 
-    const stats = enemyStats(enemy.kind);
+    const baseStats = enemyStats(enemy.kind);
+    const stats = applyEliteModifiers(baseStats, enemy.elite);
     enemy.hurtTimer     = Math.max(0, enemy.hurtTimer - dt);
     enemy.stunTimer     = Math.max(0, enemy.stunTimer - dt);
     enemy.attackCooldown = Math.max(0, enemy.attackCooldown - dt);
@@ -419,7 +693,7 @@ export const updateGame = (
     enemy.jumpCooldown  = Math.max(0, enemy.jumpCooldown - dt);
 
     // Dragon phase transition
-    if (enemy.kind === "dragon" && enemy.phase === 1 && enemy.health <= 9) {
+    if (enemy.kind === "dragon" && enemy.phase === 1 && enemy.health <= Math.floor(enemy.maxHealth / 2)) {
       enemy.phase = 2;
       spawnBurst(state.particles, enemy.x + 40, enemy.y + 28, "#c040ff", 20);
     }
@@ -568,7 +842,8 @@ export const updateGame = (
         // small knockback on player
         player.vx = (player.facing > 0 ? -1 : 1) * 120;
       } else {
-        enemy.health--;
+        const dmg = 1;
+        enemy.health -= dmg;
         enemy.hurtTimer = 0.24;
         enemy.stunTimer = enemy.kind === "golem" || enemy.kind === "mummy" || enemy.kind === "pharaoh"
           ? 0.3
@@ -576,6 +851,16 @@ export const updateGame = (
           : 0.22;
         enemy.vx = player.facing * (enemy.kind === "golem" || enemy.kind === "pharaoh" || enemy.kind === "dragon" ? 120 : 210);
         enemy.vy = enemy.kind === "bat" || enemy.kind === "gargoyle" || enemy.kind === "dragon" ? -50 : -160;
+
+        // Damage text
+        spawnDamageText(state.damageTexts, enemy.x + enemy.width / 2, enemy.y - 8, dmg, "#ffcc00");
+
+        // Combo
+        state.combo.count++;
+        state.combo.timer = comboTimeout;
+
+        // Screen shake on hit
+        triggerShake(state.screenShake, 2, 0.08);
 
         const burstColor =
           enemy.kind === "golem"    ? "#ffbc7a" :
@@ -592,6 +877,25 @@ export const updateGame = (
         if (enemy.health <= 0) {
           enemy.alive = false;
           spawnPickup(state.pickups, enemy);
+
+          // Death animation
+          state.deathAnimations.push({
+            x: enemy.x,
+            y: enemy.y,
+            width: enemy.width,
+            height: enemy.height,
+            timer: 0.4,
+            kind: enemy.kind,
+            color: burstColor,
+          });
+
+          // Larger screen shake on kill
+          triggerShake(state.screenShake, 5, 0.2);
+
+          // Death explosion particles
+          spawnDeathBurst(state.particles, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2,
+                         enemy.width, enemy.height, burstColor);
+
           // Lava sprite: extra fire burst on death
           if (enemy.kind === "lava_sprite") {
             for (let i = 0; i < 18; i++) {
@@ -620,6 +924,7 @@ export const updateGame = (
       enemy.alive &&
       enemy.attackCooldown <= 0 &&
       player.hurtTimer <= 0 &&
+      player.dashTimer <= 0 &&
       enemy.kind !== "pharaoh" && // pharaoh uses projectiles only
       enemy.kind !== "dragon" &&  // dragon uses projectiles only
       rectsOverlap(player.x, player.y, player.width, player.height,
@@ -631,6 +936,8 @@ export const updateGame = (
       player.vx = (player.x < enemy.x ? -1 : 1) * 180;
       player.vy = -240;
       spawnBurst(state.particles, player.x + player.width / 2, player.y + player.height / 2, "#ff8f9f", 10);
+      triggerShake(state.screenShake, 6, 0.2);
+      spawnDamageText(state.damageTexts, player.x + player.width / 2, player.y, stats.damage, "#ff4444");
     }
   });
 
@@ -655,9 +962,10 @@ export const updateGame = (
         return false;
       }
 
-      // Player collision
+      // Player collision (skip if dashing)
       if (
         player.hurtTimer <= 0 &&
+        player.dashTimer <= 0 &&
         rectsOverlap(pr.x - pr.radius, pr.y - pr.radius, pr.radius * 2, pr.radius * 2,
                      player.x, player.y, player.width, player.height)
       ) {
@@ -666,6 +974,8 @@ export const updateGame = (
         player.vx = Math.sign(pr.vx) * 160;
         player.vy = -220;
         spawnBurst(state.particles, pr.x, pr.y, pr.glowColor, 10);
+        triggerShake(state.screenShake, 5, 0.18);
+        spawnDamageText(state.damageTexts, player.x + player.width / 2, player.y, pr.damage, "#ff4444");
         return false;
       }
 
@@ -674,6 +984,7 @@ export const updateGame = (
 
   // ── Pickups ──────────────────────────────────────────────────────────────────
 
+  const pickupRange = passives.includes("crystal_magnet") ? 36 : 20;
   state.pickups = state.pickups
     .map((pk) => {
       const next = { ...pk, vy: pk.vy + GRAVITY * 0.35 * dt };
@@ -687,9 +998,10 @@ export const updateGame = (
       return next;
     })
     .filter((pk) => {
+      const half = pickupRange / 2;
       const collected = rectsOverlap(
         player.x, player.y, player.width, player.height,
-        pk.x - 10, pk.y - 10, 20, 20,
+        pk.x - half, pk.y - half, pickupRange, pickupRange,
       );
       if (!collected) return true;
       if (pk.type === "crystal") {
@@ -700,6 +1012,23 @@ export const updateGame = (
       spawnBurst(state.particles, pk.x, pk.y, "#89e6ff", 8);
       return false;
     });
+
+  // ── Damage texts ────────────────────────────────────────────────────────────
+
+  state.damageTexts = state.damageTexts
+    .map((t) => ({
+      ...t,
+      x: t.x + t.vx * dt,
+      y: t.y + t.vy * dt,
+      life: t.life - dt,
+    }))
+    .filter((t) => t.life > 0);
+
+  // ── Death animations ────────────────────────────────────────────────────────
+
+  state.deathAnimations = state.deathAnimations
+    .map((d) => ({ ...d, timer: d.timer - dt }))
+    .filter((d) => d.timer > 0);
 
   // ── Particles ────────────────────────────────────────────────────────────────
 
@@ -712,6 +1041,18 @@ export const updateGame = (
       life: p.life - dt,
     }))
     .filter((p) => p.life > 0);
+
+  // ── Foreground particles ────────────────────────────────────────────────────
+
+  spawnForegroundParticles(state.foregroundParticles, stage.theme, state.cameraX, VIEW_WIDTH, stage.map.length * TILE_SIZE);
+  state.foregroundParticles = state.foregroundParticles
+    .map((fp) => ({
+      ...fp,
+      x: fp.x + fp.vx * dt,
+      y: fp.y + fp.vy * dt,
+      life: fp.life - dt,
+    }))
+    .filter((fp) => fp.life > 0);
 
   // ── Win / Lose ────────────────────────────────────────────────────────────────
 

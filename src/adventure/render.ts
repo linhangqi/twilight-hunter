@@ -1,5 +1,5 @@
 import { findPortal, findPrincess } from "./engine";
-import { BIOME_PALETTES, TILE_SIZE, VIEW_HEIGHT, VIEW_WIDTH } from "./stages";
+import { BIOME_PALETTES, TILE_SIZE, VIEW_HEIGHT, VIEW_WIDTH, resolveTraps } from "./stages";
 import { BiomeTheme, EnemyState, GameState, StageDefinition } from "./types";
 import { assetUrl } from "../utils/assets";
 
@@ -473,6 +473,62 @@ const drawTiles = (
   });
 };
 
+// ─── Traps ───────────────────────────────────────────────────────────────────
+
+const drawTraps = (ctx: CanvasRenderingContext2D, stage: StageDefinition, cameraX: number, time: number) => {
+  const traps = resolveTraps(stage);
+  if (traps.length === 0) return;
+  traps.forEach((trap) => {
+    const x = trap.x - cameraX;
+    const y = trap.y;
+    if (x < -trap.width || x > VIEW_WIDTH + trap.width) return;
+
+    if (trap.kind === "spike") {
+      // Draw triangular spikes
+      ctx.fillStyle = "#8a8a9a";
+      const spikeCount = Math.floor(trap.width / 10);
+      for (let i = 0; i < spikeCount; i++) {
+        const sx = x + i * 10;
+        ctx.beginPath();
+        ctx.moveTo(sx, y + trap.height);
+        ctx.lineTo(sx + 5, y);
+        ctx.lineTo(sx + 10, y + trap.height);
+        ctx.closePath();
+        ctx.fill();
+      }
+      // Shine highlight
+      ctx.fillStyle = "rgba(255,255,255,0.2)";
+      for (let i = 0; i < spikeCount; i++) {
+        const sx = x + i * 10;
+        ctx.fillRect(sx + 4, y + 1, 2, 4);
+      }
+    } else {
+      // Lava - pulsing glow
+      const pulse = 0.7 + Math.sin(time * 4) * 0.3;
+      ctx.save();
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = `rgba(255,80,0,${pulse * 0.6})`;
+      const lavaGrad = ctx.createLinearGradient(x, y, x, y + trap.height);
+      lavaGrad.addColorStop(0, "#ff4400");
+      lavaGrad.addColorStop(0.5, "#ff8800");
+      lavaGrad.addColorStop(1, "#ffcc00");
+      ctx.fillStyle = lavaGrad;
+      ctx.fillRect(x, y, trap.width, trap.height);
+      // Bubbles
+      for (let i = 0; i < 3; i++) {
+        const bx = x + ((time * 20 + i * trap.width / 3) % trap.width);
+        const by = y + Math.sin(time * 3 + i) * 2;
+        ctx.fillStyle = "#ffee44";
+        ctx.beginPath();
+        ctx.arc(bx, by, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+  });
+};
+
 // ─── Portal ───────────────────────────────────────────────────────────────────
 
 const drawPortal = (ctx: CanvasRenderingContext2D, stage: StageDefinition, cameraX: number) => {
@@ -532,6 +588,17 @@ const drawPlayer = (ctx: CanvasRenderingContext2D, state: GameState) => {
   const flash = player.hurtTimer > 0 && Math.floor(player.hurtTimer * 12) % 2 === 0;
   const running = Math.abs(player.vx) > 20 && player.onGround;
   const airborne = !player.onGround;
+  const dashing = player.dashTimer > 0;
+
+  // Dash afterimage
+  if (dashing) {
+    ctx.save();
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = "#aaddff";
+    ctx.fillRect(x - player.dashDirection * 12, y + 4, player.width, player.height - 8);
+    ctx.fillRect(x - player.dashDirection * 24, y + 8, player.width, player.height - 16);
+    ctx.restore();
+  }
 
   if (player.character === "legend24" && manActionSheet.complete) {
     const frame =
@@ -544,6 +611,7 @@ const drawPlayer = (ctx: CanvasRenderingContext2D, state: GameState) => {
             : MAN_FRAMES.idle;
     ctx.save();
     if (flash) ctx.globalAlpha = 0.74;
+    if (dashing) ctx.globalAlpha = 0.85;
     if (player.facing < 0) {
       ctx.translate(x + player.width / 2, 0);
       ctx.scale(-1, 1);
@@ -575,6 +643,7 @@ const drawPlayer = (ctx: CanvasRenderingContext2D, state: GameState) => {
     }
     ctx.save();
     if (flash) ctx.globalAlpha = 0.72;
+    if (dashing) ctx.globalAlpha = 0.85;
     ctx.translate(x + player.width / 2, y + player.height / 2);
     if (player.facing < 0) ctx.scale(-1, 1);
     ctx.rotate(airborne ? player.vy * 0.00045 : running ? Math.sin(state.time * 10) * 0.03 : 0);
@@ -831,14 +900,80 @@ const drawEnemies = (ctx: CanvasRenderingContext2D, state: GameState) => {
 
     ctx.restore();
 
+    // Elite indicator - subtle ground glow + name tag
+    if (enemy.elite) {
+      const glowColor = enemy.elite === "swift" ? "#44aaff" : enemy.elite === "tough" ? "#ff8844" : "#ff4444";
+      const pulse = 0.4 + Math.sin(state.time * 3) * 0.15;
+
+      // Soft glow under feet
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.shadowBlur = 14;
+      ctx.shadowColor = glowColor;
+      ctx.fillStyle = glowColor;
+      ctx.beginPath();
+      ctx.ellipse(x + enemy.width / 2, y + enemy.height, enemy.width * 0.5, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Elite name tag
+      ctx.save();
+      ctx.font = "bold 8px monospace";
+      ctx.fillStyle = glowColor;
+      ctx.globalAlpha = 0.8;
+      ctx.textAlign = "center";
+      const eliteName = enemy.elite === "swift" ? "迅捷" : enemy.elite === "tough" ? "坚韧" : "狂暴";
+      ctx.fillText(eliteName, x + enemy.width / 2, y - 12);
+      ctx.restore();
+    }
+
     // HP bar (always screen-space, no transform)
     const barX = x + shakeX;
-    const barY = y - 8 + shakeY;
+    const barY = y - 8 + shakeY + (enemy.elite ? -8 : 0);
     ctx.fillStyle = "#2f2439";
     ctx.fillRect(barX, barY, enemy.width, 4);
     ctx.fillStyle = enemy.kind === "dragon" ? "#c040ff" :
                     enemy.kind === "pharaoh" ? "#f0c020" : "#ff8787";
     ctx.fillRect(barX, barY, (enemy.width * Math.max(0, enemy.health)) / enemy.maxHealth, 4);
+  });
+};
+
+// ─── Death Animations ────────────────────────────────────────────────────────
+
+const drawDeathAnimations = (ctx: CanvasRenderingContext2D, state: GameState) => {
+  state.deathAnimations.forEach((d) => {
+    const x = d.x - state.cameraX;
+    const y = d.y;
+    const progress = 1 - d.timer / 0.4; // 0 to 1
+    const scale = 1 + progress * 0.8; // 1.0 to 1.8 (swell)
+    const alpha = Math.max(0, 1 - progress * 1.5);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(x + d.width / 2, y + d.height / 2);
+    ctx.scale(scale, scale);
+
+    // Flash white then fade to color
+    ctx.fillStyle = progress < 0.3 ? "#ffffff" : d.color;
+    ctx.fillRect(-d.width / 2, -d.height / 2, d.width, d.height);
+
+    // Fracture lines
+    if (progress > 0.2) {
+      ctx.strokeStyle = "rgba(255,255,255,0.6)";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 4; i++) {
+        const angle = (Math.PI * 2 * i) / 4 + progress * 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(
+          Math.cos(angle) * d.width * progress,
+          Math.sin(angle) * d.height * progress,
+        );
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
   });
 };
 
@@ -900,6 +1035,104 @@ const drawParticles = (ctx: CanvasRenderingContext2D, state: GameState) => {
   ctx.globalAlpha = 1;
 };
 
+// ─── Damage Texts ────────────────────────────────────────────────────────────
+
+const drawDamageTexts = (ctx: CanvasRenderingContext2D, state: GameState) => {
+  state.damageTexts.forEach((t) => {
+    const x = t.x - state.cameraX;
+    const y = t.y;
+    const alpha = Math.max(0, t.life / 0.8);
+    const scale = 1 + (1 - alpha) * 0.3;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = `bold ${Math.round(14 * scale)}px monospace`;
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#000";
+    ctx.fillText(`-${t.value}`, x + 1, y + 1);
+    ctx.fillStyle = t.color;
+    ctx.fillText(`-${t.value}`, x, y);
+    ctx.restore();
+  });
+};
+
+// ─── Combo Display ───────────────────────────────────────────────────────────
+
+const drawCombo = (ctx: CanvasRenderingContext2D, state: GameState) => {
+  if (state.combo.count < 2) return;
+
+  const alpha = Math.min(1, state.combo.timer);
+  const scale = 1 + Math.max(0, 0.3 - (1.5 - state.combo.timer) * 0.6);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = `bold ${Math.round(20 * scale)}px monospace`;
+  ctx.textAlign = "center";
+
+  const comboColor = state.combo.count >= 10 ? "#ff4444" :
+                     state.combo.count >= 5 ? "#ffaa00" : "#ffcc44";
+
+  // Shadow
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillText(`${state.combo.count} Hit!`, VIEW_WIDTH / 2 + 2, 52);
+  // Text
+  ctx.fillStyle = comboColor;
+  ctx.fillText(`${state.combo.count} Hit!`, VIEW_WIDTH / 2, 50);
+
+  ctx.restore();
+};
+
+// ─── Foreground Particles ────────────────────────────────────────────────────
+
+const drawForegroundParticles = (ctx: CanvasRenderingContext2D, state: GameState) => {
+  state.foregroundParticles.forEach((fp) => {
+    const x = fp.x - state.cameraX;
+    const y = fp.y;
+    const alpha = Math.min(1, fp.life / (fp.maxLife * 0.3), (fp.maxLife - fp.life + fp.maxLife * 0.3) / (fp.maxLife * 0.3));
+
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, alpha * 0.7);
+
+    switch (fp.type) {
+      case "leaf":
+        // Rotating leaf
+        ctx.translate(x, y);
+        ctx.rotate(state.time * 2 + fp.x * 0.1);
+        ctx.fillStyle = fp.color;
+        ctx.fillRect(-fp.size / 2, -fp.size / 4, fp.size, fp.size / 2);
+        break;
+      case "ember":
+        ctx.fillStyle = fp.color;
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = fp.color;
+        ctx.beginPath();
+        ctx.arc(x, y, fp.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        break;
+      case "bird":
+        // Simple V shape
+        ctx.strokeStyle = fp.color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x - 4, y + 2);
+        ctx.lineTo(x, y - 2);
+        ctx.lineTo(x + 4, y + 2);
+        ctx.stroke();
+        break;
+      case "dust":
+        ctx.fillStyle = fp.color;
+        ctx.globalAlpha *= 0.5;
+        ctx.beginPath();
+        ctx.arc(x, y, fp.size, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+    }
+
+    ctx.restore();
+  });
+};
+
 // ─── Fog vignette ────────────────────────────────────────────────────────────
 
 const drawFog = (ctx: CanvasRenderingContext2D, theme: BiomeTheme) => {
@@ -920,14 +1153,35 @@ export const renderGame = (
 ) => {
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+
+  // Screen shake offset
+  const shake = state.screenShake;
+  let shakeX = 0;
+  let shakeY = 0;
+  if (shake.timer > 0 && shake.intensity > 0) {
+    const t = shake.timer * 40;
+    shakeX = Math.sin(t * 7.3) * shake.intensity * (shake.timer / 0.2);
+    shakeY = Math.cos(t * 5.7) * shake.intensity * 0.7 * (shake.timer / 0.2);
+  }
+
+  ctx.save();
+  ctx.translate(Math.round(shakeX), Math.round(shakeY));
+
   drawParallax(ctx, stage.theme, state.cameraX);
   drawTiles(ctx, stage, state.cameraX);
+  drawTraps(ctx, stage, state.cameraX, state.time);
   drawPortal(ctx, stage, state.cameraX);
   drawPrincess(ctx, stage, state);
   drawPickups(ctx, state);
   drawProjectiles(ctx, state);
+  drawDeathAnimations(ctx, state);
   drawEnemies(ctx, state);
   drawPlayer(ctx, state);
   drawParticles(ctx, state);
+  drawDamageTexts(ctx, state);
   drawFog(ctx, stage.theme);
+  drawForegroundParticles(ctx, state);
+  drawCombo(ctx, state);
+
+  ctx.restore();
 };
